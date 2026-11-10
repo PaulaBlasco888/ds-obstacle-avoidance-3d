@@ -1,0 +1,15 @@
+__pycache__/
+*.egg-info/
+*.pyc
+.ipynb_checkpoints/
+# LaTeX build files
+report/*.aux
+report/*.log
+report/*.out
+report/*.toc
+report/*.synctex.gz
+# video (too big for GitHub, uploaded to YouTube)
+figures/*.mp4
+# notes in Spanish (not part of the submission)
+EXPLICACION_SESION2.md
+matlab/

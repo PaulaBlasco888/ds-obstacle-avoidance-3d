@@ -1,0 +1,8 @@
+numpy>=2.0
+scipy>=1.11
+matplotlib>=3.8
+cvxpy>=1.5
+clarabel
+roboticstoolbox-python>=1.1
+spatialmath-python
+imageio-ffmpeg
