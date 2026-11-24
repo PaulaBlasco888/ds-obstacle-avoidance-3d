@@ -93,7 +93,7 @@ All the details and results are in `report/report.pdf`.
 
 - S. M. Khansari-Zadeh, A. Billard. *Learning stable nonlinear dynamical systems with Gaussian mixture models.* IEEE T-RO, 2011.
 - S. M. Khansari-Zadeh, A. Billard. *A dynamical system approach to realtime obstacle avoidance.* Autonomous Robots, 2012.
-- N. Figueroa, A. Billard. *A physically-consistent Bayesian non-parametric mixture model for dynamical system learning.* CoRL, 2018.
+- N. Figueroa, A. Billard. *Learning globally stable linear parameter varying dynamical systems.* RSS, 2018.
 - L. Huber, A. Billard, J.-J. Slotine. *Avoidance of convex and concave obstacles with convergence ensured through contraction.* IEEE RA-L, 2019.
 - P. Corke, J. Haviland. *Not your grandmother's toolbox: the Robotics Toolbox reinvented for Python.* ICRA, 2021.
 - Lab code: `ds-opt` / `phys-gmm` (N. Figueroa, LASA-EPFL) and `dynamic_obstacle_avoidance` (L. Huber, maintained by A. Prados).
