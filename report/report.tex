@@ -1,4 +1,4 @@
-﻿\documentclass[10.5pt,a4paper]{article}
+﻿\documentclass[10pt,a4paper]{article}
 \usepackage[a4paper,margin=2cm]{geometry}
 \usepackage[T1]{fontenc}
 \usepackage[utf8]{inputenc}
@@ -15,27 +15,29 @@
 \captionsetup{font=small,labelfont=bf}
 \setlength{\parskip}{0.35em}
 \setlength{\parindent}{0pt}
-\graphicspath{{../figures/}}
+\graphicspath{{../figures/}{./}}
 
 % ---------------------------------------------------------------- fill in --
-\newcommand{\authors}{Paula Blasco}
 \newcommand{\githuburl}{\url{https://github.com/PaulaBlasco888/ds-obstacle-avoidance-3d}}
-\newcommand{\videourl}{\textcolor{red}{[YouTube link]}}
+\newcommand{\videourl}{\url{https://youtu.be/3RWVf6ickV8}}
 
 \begin{document}
 
 % ================================================================== COVER ==
 \begin{titlepage}
 \centering
-\vspace*{3cm}
-{\large Universidad Carlos III de Madrid\par}
-{\large Robot's Control Architectures, Laboratory Project\par}
-\vspace{2.5cm}
-{\LARGE\bfseries 3D Obstacle Avoidance and Control\\[0.3em] using Dynamical Systems\par}
-\vspace{2cm}
-{\large \authors\par}
-\vspace{0.5cm}
-{\large November 2026\par}
+\vspace*{1.5cm}
+\includegraphics[width=0.33\textwidth]{uc3m_logo.png}\par
+\vspace{2.2cm}
+{\LARGE\bfseries Robot's Control Architectures\par}
+\vspace{0.4cm}
+{\Large\bfseries Laboratory Project: 3D Obstacle Avoidance and\\[0.2em] Control using Dynamical Systems\par}
+\vspace{1.5cm}
+{\large\bfseries
+100523002 - Paula Blasco Sánchez\\[0.3em]
+100502533 - Alberto Tono\\[0.3em]
+100487720 - Tala Issa Gammoh\\[0.3em]
+100522979 - Rodrigo Mariz\par}
 \vfill
 \begin{tabular}{rl}
 Source code: & \githuburl \\
@@ -45,74 +47,77 @@ Video: & \videourl
 \end{titlepage}
 
 % ============================================================ 1. INTRO ======
-\section{Introduction and problem statement}
+\section{Introduction and Problem Statement}
 
-The goal of this project is to move a robot's end-effector from any starting point to a target
-$x^*\in\mathbb{R}^3$ while avoiding an obstacle, without planning a path beforehand. Instead of a
-trajectory, the robot follows a \emph{dynamical system} (DS) $\dot x = f(x)$ that gives the desired
-velocity at every point. If $f$ is globally asymptotically stable at $x^*$, the robot reaches the
-target from anywhere and recovers naturally from perturbations. Obstacles are handled by locally
-\emph{modulating} that velocity field, $\dot x = M(x)f(x)$, which is cheap enough to be evaluated
-at every control step.
+The idea of this project is to move the end-effector of a robot from a starting point to a target
+$x^*\in\mathbb{R}^3$ while it avoids an obstacle, but without planning the path beforehand. Instead of
+following a fixed trajectory, the robot follows a \emph{dynamical system} (DS) $\dot x = f(x)$, which
+gives us the velocity the robot should have at every point of the space. If $f$ is globally
+asymptotically stable at $x^*$, the robot will reach the target from wherever it starts, and if
+something pushes it, it just continues from the new position. To avoid the obstacle we don't change
+the path, we \emph{modulate} the velocity near the obstacle with a matrix, $\dot x = M(x)f(x)$. This
+is very cheap to compute so it can be done in every control step.
 
-We put together the two lab sessions. In Lab~1 we learned stable non-linear DS from demonstrations
-(SEDS and LPV-DS). The obstacle-avoidance code from Lab~2 only modulated a linear attractor
-$f(x)=-(x-x^*)$, which goes straight to the target. Our work had four steps:
+In this project we combined the two lab sessions. In Lab~1 we learned stable non-linear DS from
+demonstrations (SEDS~\cite{khansari2011} and LPV-DS~\cite{figueroa}, with the code of~\cite{code}), and in Lab~2 the obstacle avoidance code only worked with a linear
+attractor $f(x)=-(x-x^*)$, which just goes in a straight line to the target. Our work was divided in
+four steps:
 \begin{enumerate}
-\item Port the LPV-DS learning to Python and plug it into the 2D obstacle-avoidance package, replacing
+\item Port the LPV-DS learning to Python and use it inside the 2D obstacle avoidance package instead of
 the linear attractor.
-\item Learn a 3D LPV-DS from real robot demonstrations and check its stability, both analytically
-and empirically.
-\item Implement the 3D obstacle model ($\Gamma(x)$, $n(x)$, orthonormal basis, $D(x)$,
-$M(x)\in\mathbb{R}^{3\times 3}$) ourselves and simulate the end-effector as a point.
-\item Use the modulated DS to drive a Franka Emika Panda through its Jacobian,
-$\dot q = J^{+}(q)\dot x_{mod}$, respecting the real joint limits.
+\item Learn a 3D LPV-DS from real robot demonstrations and check that it is stable (analytically and
+also numerically).
+\item Implement ourselves the 3D obstacle model ($\Gamma(x)$, $n(x)$, orthonormal basis, $D(x)$ and
+$M(x)\in\mathbb{R}^{3\times 3}$) and simulate the end-effector as a point.
+\item Use the modulated DS to move a Franka Emika Panda arm with its Jacobian,
+$\dot q = J^{+}(q)\dot x_{mod}$, respecting the real joint limits of the robot.
 \end{enumerate}
 
 % ======================================================= 2. FORMULATION =====
-\section{Mathematical formulation in $\mathbb{R}^3$}
+\section{Mathematical Formulation in $\mathbb{R}^3$}
 
-\paragraph{Nominal DS (LPV-DS).} Following Figueroa and Billard~\cite{figueroa}, the DS is a
-state-dependent mixture of linear systems:
+\paragraph{Nominal DS (LPV-DS).} As in Figueroa and Billard~\cite{figueroa}, the DS is a mixture of
+linear systems that changes with the position:
 \begin{equation}
 f(x)=\sum_{k=1}^{K}\gamma_k(x)\,(A_k x+b_k),\qquad
 \gamma_k(x)=\frac{\pi_k\,\mathcal{N}(x\,|\,\mu_k,\Sigma_k)}{\sum_j \pi_j\,\mathcal{N}(x\,|\,\mu_j,\Sigma_j)} .
 \end{equation}
-The weights $\gamma_k$ come from a Gaussian mixture model (GMM) fitted to the demonstrated
-positions, so $\gamma_k\ge 0$ and $\sum_k\gamma_k=1$. The matrices $A_k$ are found by minimising
-$\sum_n\|f(x_n)-\dot x_n\|$ over the demonstrations, subject to
+The weights $\gamma_k$ come from a Gaussian Mixture Model (GMM) fitted to the positions of the
+demonstrations, so $\gamma_k\ge 0$ and they always add up to 1. To get the matrices $A_k$ we minimise
+the error $\sum_n\|f(x_n)-\dot x_n\|$ with the demonstrated velocities, with these constraints:
 \begin{equation}
 A_k^{T}P+PA_k\preceq-\varepsilon I,\qquad b_k=-A_k x^*,\qquad k=1,\dots,K,
 \label{eq:constr}
 \end{equation}
-with $P\succ 0$ fixed beforehand. For a fixed $P$ these are linear matrix inequalities, so the problem
-is a convex semidefinite program.
+where $P\succ 0$ is fixed before. If $P$ is fixed these are linear matrix inequalities, so the whole
+problem is a convex semidefinite program (SDP).
 
-\paragraph{Stability.} Take $V(x)=(x-x^*)^{T}P(x-x^*)$, which is positive definite. With
-$b_k=-A_kx^*$ we get $f(x)=\sum_k\gamma_k(x)A_k(x-x^*)$, so $f(x^*)=0$ and
+\paragraph{Stability.} We take $V(x)=(x-x^*)^{T}P(x-x^*)$, which is positive definite. Since
+$b_k=-A_kx^*$, the DS can be written as $f(x)=\sum_k\gamma_k(x)A_k(x-x^*)$, so $f(x^*)=0$ and
 \begin{equation}
 \dot V(x)=\sum_{k=1}^{K}\gamma_k(x)\,(x-x^*)^{T}\big(A_k^{T}P+PA_k\big)(x-x^*)
-\;\le\; -\varepsilon\,\|x-x^*\|^2<0\quad \forall x\neq x^* ,
+\;\le\; -\varepsilon\,\|x-x^*\|^2<0\quad \forall x\neq x^* .
 \end{equation}
-because every term is negative and the $\gamma_k$ are a convex combination. $V$ is therefore a global
-Lyapunov function and $x^*$ is globally asymptotically stable. With $P=I$ (the QLF of the original
-paper) the robot would be forced to always get closer to $x^*$ in Euclidean distance, which several
-demonstrated shapes do not do. So we first learn $P$ with a second convex problem that makes the
-demonstrations agree with $\dot V<0$ as much as possible:
-$\min_P \sum_n \max\!\big(0,\ \hat{x}_n^{T}P\,\hat{\dot x}_n+0.05\big)$ s.t.
-$P\succeq 0.2\,I,\ \mathrm{tr}(P)=3$, where $\hat{\cdot}$ denotes unit vectors.
+Every term of the sum is negative and the $\gamma_k$ are a convex combination, so $\dot V<0$
+everywhere except at the target. This means $V$ is a global Lyapunov function and $x^*$ is globally
+asymptotically stable. At first we tried $P=I$ (the QLF of the paper), but this forces the robot to
+always get closer to $x^*$ in Euclidean distance, and some of the demonstrated shapes don't do that.
+So before learning $A_k$ we learn $P$ with another convex problem, that makes the demonstrations agree
+as much as possible with $\dot V<0$:
+$\min_P \sum_n \max\!\big(0,\ \hat{x}_n^{T}P\,\hat{\dot x}_n+0.05\big)$ with
+$P\succeq 0.2\,I$ and $\mathrm{tr}(P)=3$ (the hat means unit vectors).
 
-\paragraph{Obstacle.} The obstacle is an ellipsoid with centre $c$, orientation $R$, semi-axes $a_i$ and
-a safety factor $s_f$. In its local frame $\tilde x = R^{T}(x-c)$:
+\paragraph{Obstacle.} The obstacle is an ellipsoid with centre $c$, orientation $R$, semi-axes $a_i$
+and a safety factor $s_f$. Using the local frame of the obstacle, $\tilde x = R^{T}(x-c)$:
 \begin{equation}
 \Gamma(x)=\sum_{i=1}^{3}\left(\frac{\tilde x_i}{s_f\,a_i}\right)^{2},\qquad
 n(x)=\frac{\nabla\Gamma(x)}{\|\nabla\Gamma(x)\|},\qquad
 \nabla\Gamma = R\left[\frac{2\tilde x_i}{(s_f a_i)^2}\right]_{i}.
 \end{equation}
-$\Gamma=1$ on the (enlarged) surface, $\Gamma>1$ outside and $\Gamma<1$ inside. The normal is completed
-to a right-handed orthonormal basis $[n,e_1,e_2]$ with $e_1 = n\times h/\|n\times h\|$ and
-$e_2=n\times e_1$, where $h$ is the canonical axis least aligned with $n$ (this avoids
-$n\times h\approx 0$).
+$\Gamma=1$ on the surface (including the margin), $\Gamma>1$ outside and $\Gamma<1$ inside. With the
+normal we build an orthonormal basis $[n,e_1,e_2]$, where $e_1 = n\times h/\|n\times h\|$ and
+$e_2=n\times e_1$. Here $h$ is the axis ($x$, $y$ or $z$) that is less aligned with $n$, so that
+$n\times h$ never becomes almost zero.
 
 \paragraph{Modulation.} Following~\cite{khansari2012,huber2019}:
 \begin{equation}
@@ -120,97 +125,104 @@ M(x)=E(x)D(x)E(x)^{-1},\quad E=[\,r\;\;e_1\;\;e_2\,],\quad
 D=\mathrm{diag}\Big(1-\tfrac{1}{\Gamma},\;1+\tfrac{1}{\Gamma},\;1+\tfrac{1}{\Gamma}\Big),\quad
 \dot x_{mod}=M(x)f(x),
 \end{equation}
-where $r=(x-x_{ref})/\|x-x_{ref}\|$ points away from a reference point inside the obstacle (its
-centre here; for a sphere $r=n$). On the surface the first eigenvalue is zero, so the component of $f$
-that would push into the obstacle disappears and only tangential motion is left. Far away
-$D\to I$ and the learned DS is unchanged. Once the robot is moving away from the obstacle
-($n^{T}f>0$) we set $\lambda_r=1$, so it is not slowed down after passing it.
+where $r=(x-x_{ref})/\|x-x_{ref}\|$ is the direction from a reference point inside the obstacle (in our
+case the centre, and for a sphere $r=n$). On the surface the first eigenvalue is 0, so the part of the
+velocity that goes into the obstacle is removed and only the tangential part is left. Far from the
+obstacle $D$ becomes the identity, so the learned DS is not changed. Also, when the robot is already
+moving away from the obstacle ($n^{T}f>0$) we put $\lambda_r=1$, so it doesn't slow down after
+passing it.
 
-\paragraph{Robot.} The end-effector of the Panda tracks $\dot x_{mod}$ while keeping the gripper
-vertical. With $J(q)\in\mathbb{R}^{6\times 7}$ the geometric Jacobian:
+\paragraph{Robot.} The end-effector of the Panda has to follow $\dot x_{mod}$ and keep the gripper
+pointing down. With the geometric Jacobian $J(q)\in\mathbb{R}^{6\times 7}$:
 \begin{equation}
-\dot q = J^{\dagger}\begin{bmatrix}\dot x_{mod}\\ \omega\end{bmatrix}
-+\big(I-J^{\dagger}J\big)\dot q_0,\qquad
-J^{\dagger}=J^{T}\big(JJ^{T}+\lambda^2 I\big)^{-1},\qquad
+\dot q = J^{+}\begin{bmatrix}\dot x_{mod}\\ \omega\end{bmatrix}
++\big(I-J^{+}J\big)\dot q_0,\qquad
+J^{+}=J^{T}\big(JJ^{T}+\lambda^2 I\big)^{-1},\qquad
 \dot q_{0,i}=-k\,\frac{q_i-\bar q_i}{(\Delta q_i/2)^2},
 \end{equation}
-where $\omega$ is proportional to the orientation error and $\dot q_0$ keeps the redundant joint
-away from its limits.
+where $\omega$ is proportional to the orientation error. The Panda has 7 joints and the task only
+needs 6, so we use the extra one ($\dot q_0$ in the null space) to keep the joints away from their
+limits.
 
 % ===================================================== 3. IMPLEMENTATION ===
-\section{Implementation details and algorithm}
+\section{Implementation Details and Algorithm}
 
 Everything is written in Python (NumPy, SciPy, cvxpy with the Clarabel solver, Matplotlib and the
-Robotics Toolbox for Python~\cite{rtb}). The main modules are:
+Robotics Toolbox for Python~\cite{rtb}). The main files are:
 \begin{itemize}
-\item \texttt{ds\_learning/lpvds.py}: dataset loading (same preprocessing as \texttt{ds-opt}), GMM
-with EM and BIC model selection, learning of $P$, the SDP for $A_k$, and evaluation and RK4 simulation.
-\item \texttt{ds\_learning/obstacle3d.py}: the ellipsoid class with $\Gamma$, $n$, the basis,
-$D$, $M$ and the modulated velocity.
+\item \texttt{ds\_learning/lpvds.py}: loads the datasets (with the same preprocessing as \texttt{ds-opt}),
+GMM with EM and BIC, learning of $P$, the SDP for $A_k$, and the evaluation and simulation (RK4).
+\item \texttt{ds\_learning/obstacle3d.py}: ellipsoid class with $\Gamma$, $n$, the basis, $D$, $M$ and
+the modulated velocity.
 \item Scripts: \texttt{main\_3d.py} (3D results), \texttt{robot\_sim.py} (Panda), \texttt{test\_modulation.py}
-(unit checks),\\ \texttt{session2\_lpvds\_obstacle\_2d.py} (2D) and \texttt{make\_video.py} (video).
+(checks),\\ \texttt{session2\_lpvds\_obstacle\_2d.py} (2D) and \texttt{make\_video.py} (video).
 \end{itemize}
 
-\textbf{Practical issues.} The MATLAB code from Lab~1 needs the Statistics Toolbox, which we did not
-have, so we ported it. We also wrote our own EM, because the Windows machine we used blocked some
-compiled packages such as scikit-learn. In 2D we fixed the obstacle package so that its animation and
-streamlines actually use the \texttt{dynamicalSystem} argument; before, it always used the linear
-attractor. In 3D, a GMM fitted on positions alone mixed parts of the demonstrations that pass close
-to each other in opposite directions. Following the idea of the physically-consistent GMM of
-Lab~1, we cluster on $[x;\ w\,\sigma\,\dot x/\|\dot x\|]$ ($w=4$, $\sigma$ the position spread) and
-keep only the position part of each Gaussian for $\gamma_k$. This halved the reproduction error.
+\textbf{Problems we found.} The code of Lab~1 is in MATLAB and it needs the Statistics Toolbox,
+which we didn't have installed, so we decided to do the project in Python (as the guidelines
+recommend) and adapted the LPV-DS learning part. Some libraries also gave us problems on Windows,
+so in the end we installed everything with pip. In 2D we saw that the animation of the obstacle
+package was always using the linear attractor, even when we passed it another DS, so we changed a
+few lines so it uses the \texttt{dynamicalSystem} argument. In 3D, the first GMM we fitted only used
+the positions, and some parts of the demonstrations that pass close to each other but in opposite
+directions ended up in the same Gaussian. To fix it we also used the direction of the velocity when
+fitting the GMM (a bit like the physically-consistent GMM of Lab~1) and then kept only the position
+part for $\gamma_k$. With this the reproduction error went down to half.
 
-\textbf{Control loop} (one step, $\Delta t=10$\,ms):
+\textbf{Control loop} (every $\Delta t=10$\,ms):
 \begin{enumerate}
-\item Read $q$ and compute $p=FK(q)$ and $x=p-t_{task}$. The demonstrations were recorded with a
-different robot, so we shift the task by a constant $t_{task}$ into the Panda workspace. Since
-$\dot x=f(x)$ does not depend on the origin, the learned behaviour is unchanged.
-\item Evaluate $f(x)$ (LPV-DS), $\Gamma(x)$, $n$, $E$, $D$ and $\dot x_{mod}=M(x)f(x)$.
-\item Compute $\dot q$ with the damped pseudo-inverse ($\lambda=0.02$) and the null-space term.
-\item Scale $\dot q$ down if any joint exceeds the Panda velocity limit, integrate, and clip to the
-joint limits.
+\item Read $q$, compute $p=FK(q)$ and $x=p-t_{task}$. The demonstrations were recorded with another
+robot, so we move the task into the workspace of the Panda with a constant offset $t_{task}$. Since
+$\dot x=f(x)$ doesn't depend on where the origin is, the learned motion stays the same.
+\item Compute $f(x)$ (LPV-DS), $\Gamma(x)$, $n$, $E$, $D$ and $\dot x_{mod}=M(x)f(x)$.
+\item Compute $\dot q$ with the damped pseudo-inverse ($\lambda=0.02$) plus the null space term.
+\item If any joint goes over the velocity limit of the Panda, scale $\dot q$ down, then integrate and
+clip $q$ to the joint limits.
 \end{enumerate}
 
 % ========================================================== 4. RESULTS =====
-\section{Results and trajectory analysis}
+\section{Results and Trajectory Analysis}
 
-\paragraph{2D integration (Lab Session 2).} Fig.~\ref{fig:2d} shows the same obstacle modulating
-the original linear attractor and an LPV-DS learned from the S-shape dataset ($K=8$). The modulated
-LPV-DS keeps the demonstrated S and goes around the obstacle. Starting from the 3 demonstrations and
-3 perturbed points, all six trajectories reached the target (final error $<0.02$) with
-$\Gamma_{min}\in[1.06,\,8.6]$. In our first attempt we used $P=I$, and the learned field cut through the
-S. Learning $P$ fixed it.
+\paragraph{2D integration (Lab Session 2).} Figure~\ref{fig:2d} shows the same obstacle with the
+original linear attractor and with an LPV-DS learned from the S-shape dataset ($K=8$). With the
+learned DS the trajectories keep the S shape of the demonstrations and go around the obstacle. We
+started 6 trajectories (the 3 demonstrations and 3 perturbed points) and all of them reached the
+target with a final error below 0.02, with $\Gamma_{min}$ between 1.06 and 8.6. In the first try we
+used $P=I$ and the learned field cut through the S, and learning $P$ solved it.
 
 \begin{figure}[h]
 \centering
 \includegraphics[width=0.74\textwidth]{sshape2d_linear_vs_lpvds.png}
-\caption{2D, Lab~2 package. Left: modulated linear attractor. Right: modulated LPV-DS learned from
-the red demonstrations. $\star$ is the target and $+$ the reference point of the obstacle.}
+\caption{2D with the Lab~2 package. Left: modulated linear attractor. Right: modulated LPV-DS learned
+from the demonstrations (red). The star is the target and the cross is the reference point of the
+obstacle.}
 \label{fig:2d}
 \end{figure}
 
-\paragraph{3D DS.} We used \texttt{3D\_viapoint\_3} from the Lab~1 datasets (6 demonstrations,
-2042 samples, a motion through a via point). We first tried the C-shape, but it moves far away from
-the target before coming back, and a quadratic $V$ cannot represent that well (3 to 7\,cm of error).
-The final model has $K=8$, $\varepsilon=0.01$ and $\mathrm{eig}(P)=\{0.20,\,0.29,\,2.51\}$. It
-reproduces the demonstrations with a mean distance of 17\,mm (22\,mm in the worst one) along paths of
-about 1.1\,m. All eight $A_k^TP+PA_k$ are negative definite (largest eigenvalue $-0.01$). As an
-empirical check, $\dot V<0$ held on all of 20\,000 random points of a box around the workspace, and
-$V(x(t))$ decreases monotonically along every simulated trajectory (Fig.~\ref{fig:lyap}).
+\paragraph{3D DS.} For 3D we used \texttt{3D\_viapoint\_3} from the Lab~1 datasets (6 demonstrations,
+2042 samples, a motion that passes through a via point). First we tried with the C-shape, but this
+motion goes far away from the target before coming back, and a quadratic $V$ can't represent this
+very well (we got 3 to 7\,cm of error). The final model has $K=8$, $\varepsilon=0.01$ and
+$\mathrm{eig}(P)=\{0.20,\,0.29,\,2.51\}$. It reproduces the demonstrations with a mean distance of
+17\,mm (22\,mm in the worst one) for paths of around 1.1\,m. The eight matrices $A_k^TP+PA_k$ are
+negative definite (the largest eigenvalue is $-0.01$). We also checked it numerically, $\dot V<0$ in
+all of 20\,000 random points of a box around the workspace, and $V(x(t))$ goes down all the time along
+every trajectory we simulated (Figure~\ref{fig:lyap}).
 
 \paragraph{3D avoidance.} The ellipsoid (semi-axes 6, 4.5 and 5\,cm, rotated 30$^\circ$, $s_f=1.15$)
-is placed on the nominal path, so without modulation the robot would cross it (dashed lines in
-Fig.~\ref{fig:3d}). We start 5 trajectories at the centre, above, below, left and right of a
-demonstrated start point ($\pm3.5$\,cm). \texttt{test\_modulation.py} checks numerically that the basis
-is orthonormal ($10^{-16}$), that $n$ matches the finite-difference gradient ($10^{-11}$), that
-$|n^{T}Mf|/\|f\|<10^{-8}$ on the surface (no penetration) and that $M\to I$ far away.
+is placed on the nominal path, so without the modulation the robot would go through it (dashed lines
+in Figure~\ref{fig:3d}). We started 5 trajectories at the centre, above, below, left and right of the
+start of one demonstration ($\pm3.5$\,cm). With \texttt{test\_modulation.py} we checked numerically that
+the basis is orthonormal (error of $10^{-16}$), that $n$ is the same as the gradient computed with
+finite differences ($10^{-11}$), that $|n^{T}Mf|/\|f\|<10^{-8}$ on the surface (so the robot can't
+go inside) and that $M$ goes to the identity far away.
 
 \begin{figure}[h]
 \centering
 \includegraphics[width=0.92\textwidth]{viapoint3d_3d_trajectories.png}
-\caption{3D LPV-DS with the ellipsoidal obstacle. Solid: $\dot x = M(x)f(x)$. Dashed: $f(x)$ without
-modulation. Red dots: demonstrations. Right: zoom, where the runs go above, below and around the
-sides of the obstacle.}
+\caption{3D LPV-DS with the ellipsoid. Solid lines are $\dot x = M(x)f(x)$ and dashed lines are $f(x)$
+without modulation. The red dots are the demonstrations. On the right there is a zoom where you can
+see the trajectories going above, below and around the sides of the obstacle.}
 \label{fig:3d}
 \end{figure}
 
@@ -218,9 +230,9 @@ sides of the obstacle.}
 \centering
 \includegraphics[width=0.6\textwidth]{viapoint3d_gamma_convergence.png}\\[0.2em]
 \includegraphics[width=0.6\textwidth]{viapoint3d_lyapunov.png}
-\caption{Top: $\Gamma(x(t))$ (safety, dashed line $\Gamma=1$) and $\|x(t)-x^*\|$ (convergence) for the
-modulated runs. Bottom: $V$ along the nominal DS and $\dot V$ on 20\,000 random points (empirical
-Lyapunov check).}
+\caption{Top: $\Gamma(x(t))$ (safety, the dashed line is $\Gamma=1$) and $\|x(t)-x^*\|$ (convergence)
+for the modulated trajectories. Bottom: $V$ along the nominal DS and $\dot V$ in 20\,000 random points
+(numerical Lyapunov check).}
 \label{fig:lyap}
 \end{figure}
 
@@ -238,57 +250,57 @@ left   & 1.53 & 20.9 & 4.9 & 7.5  & 1.58 & 5.4 & 0.33 & 45.3 \\
 right  & 1.22 & 13.6 & 5.0 & 11.2 & 1.22 & 2.3 & 0.33 & 35.6 \\
 \bottomrule
 \end{tabular}
-\caption{Results for the 5 starts. $d_{min}$: closest distance to the real (non-enlarged) surface.
-Simulations stop at 5\,mm from $x^*$. Joint margin: smallest distance of any joint to its limit.}
+\caption{Results for the 5 starting points. $d_{min}$ is the closest distance to the real surface
+(without the margin). The simulations stop at 5\,mm from $x^*$. Margin is the smallest distance of
+any joint to its limit.}
 \label{tab:res}
 \end{table}
 
-Table~\ref{tab:res} sums up the runs. No trajectory enters the obstacle plus its margin
-($\Gamma_{min}\ge 1.02$, never closer than 8\,mm to the real surface) and all of them reach the
-target. The runs that start straight in front of the obstacle (centre, above, below) take longer:
-near the surface the normal component is almost cancelled, so they slide slowly around it before
-leaving.
+If we look at Table~\ref{tab:res}, none of the trajectories goes inside the obstacle plus the margin ($\Gamma_{min}\ge 1.02$, never closer than 8\,mm to the real surface) and all of them
+reach the target. The ones that start right in front of the obstacle (centre, above and below) take
+more time. This is because near the surface the normal part of the velocity is almost zero, so they
+slide slowly around it until they can leave.
 
-\paragraph{Robot.} Fig.~\ref{fig:robot} shows the Panda following the modulated DS. The commanded
-end-effector velocity is achieved with an error below 5.5\,mm/s, the joints never get closer than
-35$^\circ$ to their limits, and the largest joint speed is 34\% of the allowed one. The gripper keeps
-its vertical orientation the whole time. The centre run went around the other side of the obstacle
-compared with the point simulation. That start points almost at the obstacle's centre, where the flow
-splits, so tiny numerical differences pick a side. Both paths are valid.
+\paragraph{Robot.} In Figure~\ref{fig:robot} we can see the Panda following the modulated DS. The
+end-effector follows the commanded velocity with an error below 5.5\,mm/s, the joints are always at
+least 35$^\circ$ away from their limits, and the fastest joint only uses 34\% of its maximum speed. The
+gripper also stays vertical the whole time. On the other hand, one thing we noticed is that in the centre run the robot
+goes around the other side of the obstacle compared with the point simulation. This happens because
+that start points almost to the centre of the obstacle, which is where the flow splits, so very small
+numerical differences decide the side. Both paths are correct.
 
 \begin{figure}[!htbp]
 \centering
 \begin{minipage}{0.34\textwidth}\includegraphics[width=\textwidth]{robot_panda_3d.png}\end{minipage}\hfill
 \begin{minipage}{0.64\textwidth}\includegraphics[width=\textwidth]{robot_joints_gamma.png}\end{minipage}
-\caption{Franka Panda (Robotics Toolbox) driven by $\dot q=J^{+}(q)[\dot x_{mod};\omega]$. Left: arm
-at five instants of the centre run and end-effector paths of all runs. Right: normalised joint
-positions and velocities of the centre run (dashed lines are the limits) and $\Gamma$ of the
-end-effector for all runs.}
+\caption{Franka Panda (Robotics Toolbox) moved with $\dot q=J^{+}(q)[\dot x_{mod};\omega]$. Left: the
+arm in five moments of the centre run and the end-effector paths of all the runs. Right: normalised
+joint positions and velocities in the centre run (the dashed lines are the limits) and $\Gamma$ of
+the end-effector in all the runs.}
 \label{fig:robot}
 \end{figure}
 
 % ======================================================= 5. CONCLUSIONS =====
 \section{Conclusions}
 
-Combining a learned, provably stable DS with the modulation $M(x)=E D E^{-1}$ gives a controller
-that reproduces a demonstrated motion, avoids an obstacle it never saw during training, and still
-converges, all without replanning. Two decisions made the biggest difference. The first was learning
-$P$ instead of using $P=I$, because a plain QLF could not fit the demonstrated shapes. The second was
-clustering the demonstrations by position and direction in 3D.
+By combining a learned DS that we know is stable with the modulation $M(x)=E D E^{-1}$, we get a
+controller that repeats the demonstrated motion, avoids an obstacle that wasn't there in the
+demonstrations, and still reaches the target, all without replanning anything. In our case, the
+biggest improvements came from learning $P$ instead of using $P=I$ (with $P=I$ the shapes couldn't be
+learned well), and from clustering the 3D demonstrations using the position and also the direction.
 
-There are some limitations. Only the end-effector avoids the obstacle, so the wrist or the
-links could still touch it (the gripper is vertical and the obstacle is low, so this can happen when
-passing under it). The convergence guarantees of the modulation were proven for linear DS, so with a
-learned DS a trajectory could in principle stop on the surface. The flow also splits at the point
-of the obstacle facing the robot, and starts near that point slide slowly before moving on. Finally,
-the robot simulation is kinematic. We did not do the optional extensions (several or moving
-obstacles, whole-body avoidance), but the code would allow them: \texttt{modulate} already works for
-any star-shaped $\Gamma$.
+The method also has some limitations. Only the end-effector avoids the obstacle, so the wrist or the
+links could still hit it (for example when the gripper is vertical and it passes under the obstacle).
+The convergence guarantees of the modulation were proven for linear DS, so with a learned DS a
+trajectory could in theory get stuck on the surface. Also, at the point of the obstacle that faces
+the robot the flow splits, and trajectories that start near there slide slowly before continuing. And
+the robot simulation is only kinematic. We didn't do the optional extensions (more obstacles, moving
+obstacles or avoidance with the whole arm), but the code could be extended for them since
+\texttt{modulate} works with any star-shaped $\Gamma$.
 
-\paragraph{Use of generative AI.} We used Claude (Anthropic) through Claude Code as a programming
-assistant. It helped port the LPV-DS learning from MATLAB to Python, debug the installation, write
-the plotting and video scripts, and review the English of this report. We checked the formulation,
-the code and every result ourselves.
+\paragraph{Use of AI.} We used AI tools (Claude, by Anthropic) to help us understand some of the
+theory and as support when programming and fixing errors in the code. All the results were checked
+by us.
 
 \small
 \begin{thebibliography}{9}\setlength{\itemsep}{0pt}
